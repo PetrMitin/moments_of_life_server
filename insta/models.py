@@ -32,8 +32,8 @@ class Moment(models.Model):
     objects = MomentManager()
 
     def save(self, *args, **kwargs):
-        super().save(args, kwargs)
-        Profile.objects.filter(id=self.author).update(number_of_moments=models.F('number_of_moments') + 1)
+        super().save(*args, **kwargs)
+        Profile.objects.filter(id=self.author_id).update(number_of_moments=models.F('number_of_moments') + 1)
 
 # Комментарий – содержание, автор, дата написания
 class Comment(models.Model): 
@@ -53,9 +53,9 @@ class Subscription(models.Model):
     objects = SubscriptionManager()
 
     def save(self, *args, **kwargs):
-        super().save(args, kwargs)
-        Profile.objects.filter(id=self.author).update(number_of_subscribers=models.F('number_of_subscribers') + 1)
-        Profile.objects.filter(id=self.subscriber).update(number_of_subscribers=models.F('number_of_subscriptions') + 1)
+        super().save(*args, **kwargs)
+        Profile.objects.filter(id=self.author_id).update(number_of_subscribers=models.F('number_of_subscribers') + 1)
+        Profile.objects.filter(id=self.subscriber_id).update(number_of_subscriptions=models.F('number_of_subscriptions') + 1)
 
 # Лайк - автор, момент/комментарий, дата создания
 class MomentLike(models.Model):
@@ -66,9 +66,12 @@ class MomentLike(models.Model):
     objects = MomentLikeManager()
 
     def save(self, *args, **kwargs):
-        super().save(args, kwargs)
-        Profile.objects.filter(id=self.author).update(Profile.objects.filter(id=self.author).update(rating=models.F('rating') + 1))
+        super().save(*args, **kwargs)
+        Profile.objects.filter(id=self.author_id).update(Profile.objects.filter(id=self.author_id).update(rating=models.F('rating') + 1))
     
+    class Meta:
+        unique_together = ('author', 'moment')     
+
 class CommentLike(models.Model):
     author = models.ForeignKey(Profile, on_delete=models.CASCADE)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
@@ -77,8 +80,11 @@ class CommentLike(models.Model):
     objects = CommentLikeManager()
 
     def save(self, *args, **kwargs):
-        super().save(args, kwargs)
-        Profile.objects.filter(id=self.author).update(Profile.objects.filter(id=self.author).update(rating=models.F('rating') + 1))
+        super().save(*args, **kwargs)
+        Profile.objects.filter(id=self.author_id).update(Profile.objects.filter(id=self.author_id).update(rating=models.F('rating') + 1))
+
+    class Meta:
+        unique_together = ('author', 'comment')        
 
 # Теги - момент, название
 class Tag(models.Model):

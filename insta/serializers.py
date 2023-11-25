@@ -9,12 +9,11 @@ class ProfileSerializer(serializers.ModelSerializer):
         depth = 1
 
 class CommentSerializer(serializers.ModelSerializer):
-    is_liked = serializers.BooleanField()
     author = ProfileSerializer()
     
     class Meta:
         model = Comment
-        fields = ['id', 'content', 'author', 'creation_date', 'moment', 'is_liked']
+        fields = ['id', 'content', 'author', 'creation_date', 'moment']
 
 class MomentSerializer(serializers.ModelSerializer):
     is_liked = serializers.BooleanField(default=False)

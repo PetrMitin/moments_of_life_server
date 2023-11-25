@@ -37,9 +37,16 @@ class MomentManager(models.Manager):
     def search_by_tag(self, tag):
         return self.filter(tag__tag__contains=tag)
     
+    def create_moment(self, title, content, profile_data, image):
+        new_moment = self.create(title=title, content=content, author_id=profile_data['id'], image=image)
+        return new_moment
+    
 class CommentManager(models.Manager):
     def with_is_liked(self, curr_user_id):
         return self.annotate(is_liked=models.Max(Coalesce(models.Case(models.When(commentlike__author__user=curr_user_id, then=1)), 0)))
+    
+    def create_comment(self, content, profile_data, moment_id):
+        return self.create(content=content, author_id=profile_data['id'], moment_id=moment_id)
 
 class MomentLikeManager(models.Manager):
     def by_moment_author_user(self, user_id):

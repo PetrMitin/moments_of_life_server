@@ -15,15 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
-from insta import views
+from django.urls import path, include
+from insta.urls import urls
 
 urlpatterns = [
-    path('api/profile/<int:profile_pk>/', views.profile_data, name='profile_data'),
-    path('api/profile/<int:profile_pk>/moments/', views.moments_of_profile, name='moments_by_profile'),
-    path('api/events/', views.events_of_user, name='events_by_profile'),
-    path('api/moments/', views.moments_of_user_subscriptions, name='moments_by_subscriptions'),
-    path('api/moments/search/<str:tag>/', views.moments_by_tag, name='moments_by_tag'),
-    path('api/profile/search/<str:username>', views.profiles_by_username, name='profiles_by_username'),
-    path('api/admin/', admin.site.urls, name='admin'),
+    path('api/', include(urls)),
+    path('admin/', admin.site.urls, name='admin'),
 ]
