@@ -41,17 +41,22 @@ def moments_of_profile(request, profile_pk):
 @require_GET
 def events_of_user(request):
     user_id = 31328
+    page = request.GET.get('page')
+    page = page if page else 1
     if request.user.is_authenticated:
         user_id = request.user.id
 
     moment_likes = MomentLike.objects.by_moment_author_user(user_id=user_id)
-    moment_likes_serializer = MomentLikeEventSerializer(moment_likes, many=True)
+    moment_likes_data = paginate(moment_likes, page, 15).object_list
+    moment_likes_serializer = MomentLikeEventSerializer(moment_likes_data, many=True)
 
     comment_likes = CommentLike.objects.by_comment_author_user(user_id=user_id)
-    comment_like_serializer = CommentLikeEventSerializer(comment_likes, many=True)
+    comment_likes_data = paginate(comment_likes, page, 15).object_list
+    comment_like_serializer = CommentLikeEventSerializer(comment_likes_data, many=True)
 
     subs = Subscription.objects.by_subscribed_to_user(user_id=user_id)
-    sub_serializer = SubscriptionEventSerializer(subs, many=True)
+    subs_data = paginate(subs, page, 15).object_list
+    sub_serializer = SubscriptionEventSerializer(subs_data, many=True)
 
     return JsonResponse({
             'moment_like_events': moment_likes_serializer.data,
