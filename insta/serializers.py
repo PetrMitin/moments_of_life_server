@@ -10,18 +10,20 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     author = ProfileSerializer()
+    is_liked = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = Comment
-        fields = ['id', 'content', 'author', 'creation_date', 'moment']
+        fields = ['id', 'content', 'author', 'creation_date', 'moment_id', 'is_liked']
 
 class MomentSerializer(serializers.ModelSerializer):
-    is_liked = serializers.BooleanField(default=False)
+    is_liked = serializers.BooleanField(read_only=True)
+    comments = CommentSerializer(many=True)
+    author = ProfileSerializer()
 
     class Meta:
         model = Moment
         fields = ['id', 'content', 'author', 'creation_date', 'image', 'is_liked', 'comments']
-        depth = 2
 
 class MomentLikeEventSerializer(serializers.ModelSerializer):
     class Meta:

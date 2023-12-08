@@ -4,7 +4,8 @@ from django.db.models import F
 from insta.models import User, Profile, Moment, Comment, Subscription, MomentLike, CommentLike, Tag
 from random import randint
 from datetime import datetime
-from django.db.transaction import atomic
+from django.contrib.auth.hashers import make_password
+from psycopg2.errors import UniqueViolation
 
 class Command(BaseCommand):
     help = """
@@ -19,13 +20,16 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("num", type=int)
 
-    @atomic
     def handle(self, *args, **kwargs):
         num = kwargs['num']
         users = []
         profiles = []
         profiles_update_data = [[0, 0, 0, 0] for i in range(num)]
         for i in range(num):
+            # if you need hashed passwords for accounts in which you are able to log in,
+            # add password=make_password(f'password{i}') instead of password=f'password{i}'
+            # this will make the script much slower than it is 
+            # (profile creation will take ~4000 seconds instead of ~7)
             user = User(username=f'Username{i}', email=f'email{i}@xmpl.com', password=f'password{i}', last_login=datetime.now(tz=pytz.UTC))
             users.append(user)
             profiles.append(Profile(user=user))
@@ -51,10 +55,10 @@ class Command(BaseCommand):
 
         subs = []
         for i in range(num * 10):
-            author_id = randint(profiles[0].id, profiles[0].id + num - 1)
-            sub_id = randint(profiles[0].id, profiles[0].id + num - 1)
-            author_idx = author_id - profiles[0].id
-            sub_idx = sub_id - profiles[0].id
+            author_idx = i // 10
+            sub_idx = author_idx + 1 + i % 10 if author_idx < num - 12 else author_idx - 1 - i % 10
+            author_id = author_idx + profiles[0].id
+            sub_id = sub_idx + profiles[0].id
             subs.append(Subscription(author_id=author_id, subscriber_id=sub_id))
             profiles_update_data[author_idx][2] += 1
             profiles_update_data[sub_idx][3] += 1
@@ -63,18 +67,22 @@ class Command(BaseCommand):
 
         moment_likes = []
         for i in range(num * 100):
-            author_id = randint(profiles[0].id, profiles[0].id + num - 1)
-            moment_likes.append(MomentLike(author_id=author_id, moment_id=randint(moments[0].id, moments[0].id + num * 10 - 1)))
-            author_idx = author_id - profiles[0].id
+            author_idx = i // 100
+            author_id = author_idx + profiles[0].id
+            moment_idx = author_idx * 10 + i % 100 if author_idx * 10 < num * 10 - 102 else author_idx * 10 - i % 100
+            moment_id = moment_idx + moments[0].id
+            moment_likes.append(MomentLike(author_id=author_id, moment_id=moment_id))
             profiles_update_data[author_idx][0] += 1
         MomentLike.objects.bulk_create(moment_likes)
         print('Moment likes created', datetime.now())
 
         comment_likes = []
         for i in range(num * 100):
-            author_id = randint(profiles[0].id, profiles[0].id + num - 1)
-            comment_likes.append(CommentLike(author_id=author_id, comment_id=randint(comments[0].id, comments[0].id + num * 100 - 1)))
-            author_idx = author_id - profiles[0].id
+            author_idx = i // 100
+            author_id = author_idx + profiles[0].id
+            comment_idx = author_idx * 10 + i % 100 if author_idx * 10 < num * 10 - 102 else author_idx * 10 - i % 100
+            comment_id = comment_idx + comments[0].id
+            comment_likes.append(CommentLike(author_id=author_id, comment_id=comment_id))
             profiles_update_data[author_idx][0] += 1
         CommentLike.objects.bulk_create(comment_likes)
         print('Comment likes created', datetime.now())
