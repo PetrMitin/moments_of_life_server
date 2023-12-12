@@ -1,5 +1,6 @@
-from insta.models import Profile, Moment, MomentLike, CommentLike, Subscription
+from insta.models import *
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.uploadedfile import InMemoryUploadedFile
 
 # mb in serializer
 def is_moment_creation_data_valid(title, content, profile, image):
@@ -66,5 +67,30 @@ def is_delete_subscription_like_data_valid(author_id, subscriber_id):
     if not subscriber_id or not author_id:
         return False
     if not Subscription.objects.filter(subscriber_id=subscriber_id, author_id=author_id).first():
+        return False
+    return True
+
+def is_registration_data_valid(email, username, password, avatar):
+    print(email, username, password, avatar)
+    if not (email and username and password):
+        return False
+    if not (avatar == None or isinstance(avatar, InMemoryUploadedFile)):
+        return False
+    if User.objects.filter(email=email).first() or User.objects.filter(username=username).first():
+        return False
+    return True
+
+def is_update_profile_data_valid(email, username, password, avatar):
+    print(email, username, password, avatar)
+    if not (email and username):
+        return False
+    if not (avatar == None or isinstance(avatar, InMemoryUploadedFile)):
+        return False
+    return True
+
+def is_login_data_valid(email, password):
+    if not (email and password):
+        return False
+    if not User.objects.filter(email=email).first():
         return False
     return True

@@ -1,13 +1,17 @@
 import json
 from django.http import JsonResponse, HttpResponseNotFound, HttpResponseBadRequest
 from django.views.decorators.http import require_GET
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie, csrf_protect
+from django.contrib import auth
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from insta.models import *
 from insta.serializers import *
 from django.core.paginator import Paginator, InvalidPage, PageNotAnInteger, EmptyPage, Page
 from insta.validators import *
 from django.db.models.functions import Coalesce
+from django.contrib.auth.hashers import make_password
 
 def paginate(objects, page=1, per_page=45):
     try:
@@ -17,16 +21,15 @@ def paginate(objects, page=1, per_page=45):
         return Page([], 0, paginator)
 
 # Create your views here.
-@require_GET
+@api_view(['GET'])
 def moments_of_user_subscriptions(request):
-    user_id = 181340
     page = request.GET.get('page')
     page = page if page else 1
-    if request.user.is_authenticated:
-        user_id = request.user.id
-    curr_profile_id = Profile.objects.profile_by_user_id(user_id).id
-    if not curr_profile_id:
+    user_id = request.user.id
+    curr_profile = Profile.objects.profile_by_user_id(user_id)
+    if not curr_profile:
         return HttpResponseBadRequest()
+    curr_profile_id = curr_profile.id
     curr_user_subscriptions = Subscription.objects.user_subscribed_to_ids(user_id=user_id).values('author_id')
     moments = Moment.objects.moments_by_user_subscriptions(curr_profile_id=curr_profile_id, curr_user_subscriptions=curr_user_subscriptions)
     data = paginate(moments, page).object_list
@@ -34,11 +37,9 @@ def moments_of_user_subscriptions(request):
     print(serializer.data[0]['id'], serializer.data[0]['is_liked'])
     return JsonResponse(serializer.data, safe=False)
 
-@require_GET
+@api_view(['GET'])
 def moments_of_profile(request, profile_pk):
-    curr_user_id = 181340
-    if request.user.is_authenticated:
-        curr_user_id = request.user.id
+    curr_user_id = request.user.id
     curr_profile_id = Profile.objects.profile_by_user_id(curr_user_id).id
     if not curr_profile_id:
         return HttpResponseBadRequest()
@@ -46,13 +47,11 @@ def moments_of_profile(request, profile_pk):
     serializer = MomentSerializer(moments, many=True)
     return JsonResponse(serializer.data, safe=False)
 
-@require_GET
+@api_view(['GET'])
 def events_of_user(request):
-    user_id = 181340
     page = request.GET.get('page')
     page = page if page else 1
-    if request.user.is_authenticated:
-        user_id = request.user.id
+    user_id = request.user.id
 
     moment_likes = MomentLike.objects.by_moment_author_user(user_id=user_id)
     moment_likes_data = paginate(moment_likes, page, 15).object_list
@@ -72,11 +71,9 @@ def events_of_user(request):
             'subscription_events': sub_serializer.data
         }, safe=False)
 
-@require_GET
+@api_view(['GET'])
 def profile_data(request, profile_pk):
-    user_id = 181340
-    if request.user.is_authenticated:
-        user_id = request.user.id
+    user_id = request.user.id
     profile = Profile.objects.profile_by_id(profile_id=profile_pk)
     if not profile:
         return HttpResponseNotFound()
@@ -84,7 +81,30 @@ def profile_data(request, profile_pk):
     serializer = ProfileSerializer(profile)
     return JsonResponse({'profile': serializer.data, 'is_subscribed_flag': is_subscribed_flag}, safe=False)
 
-@require_GET
+@api_view(['PUT'])
+@csrf_protect
+def update_profile(request, profile_pk):
+    profile = Profile.objects.profile_by_id(profile_id=profile_pk)
+    user = User.objects.filter(id=profile.user_id).first()
+    if not profile or not user:
+        return HttpResponseNotFound()
+    email = request.data.get('email')
+    username = request.data.get('username')
+    password = request.data.get('password')
+    avatar = request.data.get('avatar')
+    if not is_update_profile_data_valid(email, username, password, avatar):
+        return HttpResponseBadRequest()
+    if avatar:
+        profile.avatar = avatar
+    profile.save()
+    user.username = username
+    user.email = email
+    #user.set_password(raw_password=password)
+    user.save()
+    serializer = ProfileSerializer(profile)
+    return JsonResponse(serializer.data)
+    
+@api_view(['GET'])
 def profiles_by_username(request):
     username = request.GET.get('query')
     if not username:
@@ -93,7 +113,7 @@ def profiles_by_username(request):
     serializer = ProfileSerializer(profiles, many=True)
     return JsonResponse(serializer.data, safe=False)
 
-@require_GET
+@api_view(['GET'])
 def moments_by_tag(request):
     tag = request.GET.get('query')
     if not tag:
@@ -102,7 +122,7 @@ def moments_by_tag(request):
     serializer = MomentSerializer(moments, many=True)
     return JsonResponse(serializer.data, safe=False)
 
-@csrf_exempt
+@csrf_protect
 @api_view(['POST'])
 def create_moment(request):
     title = request.data.get("title")
@@ -118,7 +138,7 @@ def create_moment(request):
     serializer = MomentSerializer(new_moment)
     return JsonResponse(serializer.data, safe=False)
 
-@csrf_exempt
+@csrf_protect
 @api_view(['POST'])
 def create_comment(request):
     content = request.data.get('content')
@@ -131,7 +151,7 @@ def create_comment(request):
     serializer = CommentSerializer(new_comment)
     return JsonResponse(serializer.data, safe=False)
 
-@csrf_exempt
+@csrf_protect
 @api_view(['POST'])
 def create_moment_like(request):
     moment_id = request.data.get('moment_id')
@@ -142,7 +162,7 @@ def create_moment_like(request):
     serializer = MomentLikeEventSerializer(moment_like)
     return JsonResponse(serializer.data, safe=False)
 
-@csrf_exempt
+@csrf_protect
 @api_view(['DELETE'])
 def delete_moment_like(request):
     moment_id = request.data.get('moment_id')
@@ -152,8 +172,7 @@ def delete_moment_like(request):
     deletion_data = MomentLike.objects.filter(moment_id=moment_id, author_id=author_id).delete()
     return JsonResponse({'successful': deletion_data[0] > 0})
 
-
-@csrf_exempt
+@csrf_protect
 @api_view(['POST'])
 def create_comment_like(request):
     comment_id = request.data.get('comment_id')
@@ -164,7 +183,7 @@ def create_comment_like(request):
     serializer = CommentLikeEventSerializer(comment_like)
     return JsonResponse(serializer.data, safe=False)
 
-@csrf_exempt
+@csrf_protect
 @api_view(['DELETE'])
 def delete_comment_like(request):
     comment_id = request.data.get('comment_id')
@@ -174,7 +193,7 @@ def delete_comment_like(request):
     deletion_data = CommentLike.objects.filter(comment_id=comment_id, author_id=author_id).delete()
     return JsonResponse({'successful': deletion_data[0] > 0})
 
-@csrf_exempt
+@csrf_protect
 @api_view(['POST'])
 def create_subscription(request):
     subscriber_id = request.data.get('subscriber_id')
@@ -185,7 +204,7 @@ def create_subscription(request):
     serializer = SubscriptionEventSerializer(sub)
     return JsonResponse(serializer.data, safe=False)
 
-@csrf_exempt
+@csrf_protect
 @api_view(['DELETE'])
 def delete_subscription(request):
     subscriber_id = request.data.get('subscriber_id')
@@ -194,3 +213,68 @@ def delete_subscription(request):
         return HttpResponseBadRequest()
     deletion_data = Subscription.objects.filter(subscriber_id=subscriber_id, author_id=author_id).delete()
     return JsonResponse({'successful': deletion_data[0] > 0})
+
+@ensure_csrf_cookie
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_csrf_token(request):
+    return JsonResponse({'success': True})
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@csrf_protect
+def registration(request):
+    email = request.data.get('email')
+    username = request.data.get('username')
+    password = request.data.get('password')
+    avatar = request.data.get('avatar')
+    if not is_registration_data_valid(email, username, password, avatar):
+        return HttpResponseBadRequest()
+    user = User(username=username, email=email)
+    user.set_password(raw_password=password)
+    user.save()
+    profile = Profile.objects.create(user=user, avatar=avatar)
+    serializer = ProfileSerializer(profile)
+    return JsonResponse(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@csrf_protect
+def login(request):
+    email = request.data.get('email')
+    password = request.data.get('password')
+    if not is_login_data_valid(email, password):
+        return HttpResponseBadRequest()
+    user = User.objects.filter(email=email).first()
+    if user:
+        user = auth.authenticate(username=user.username, password=password)
+        if user:
+            auth.login(request, user)
+            profile = Profile.objects.profile_by_user_id(user.id)
+            serializer = ProfileSerializer(profile)
+            return JsonResponse(serializer.data)
+    return HttpResponseBadRequest()
+
+@api_view(['POST'])
+@csrf_protect
+def logout(request):
+    auth.logout(request)
+    return JsonResponse({'success': True})
+    
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def is_authenticated(request):
+    res = False
+    if request.user and request.user.is_authenticated:
+        res = True
+    return JsonResponse({'isAuthenticated': res})
+
+@api_view(['GET'])
+def current_profile_data(request):
+    if request.user and request.user.is_authenticated:
+        profile = Profile.objects.profile_by_user_id(user_id=request.user.id)
+        if not profile:
+            return HttpResponseNotFound()
+        serializer = ProfileSerializer(profile)
+        return JsonResponse({serializer.data})
+    return HttpResponseBadRequest()

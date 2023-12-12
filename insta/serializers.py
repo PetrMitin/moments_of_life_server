@@ -1,8 +1,15 @@
 from rest_framework import serializers
 from django.db import models
-from insta.models import Profile, Moment, Comment, MomentLike, CommentLike, Subscription
+from insta.models import *
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
 
 class ProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+    
     class Meta:
         model = Profile
         fields = ['id', 'number_of_moments', 'number_of_subscribers', 'number_of_subscriptions', 'rating', 'user']

@@ -21,4 +21,5 @@ from insta.urls import urls
 urlpatterns = [
     path('api/', include(urls)),
     path('admin/', admin.site.urls, name='admin'),
+    path('auth/', include('rest_framework.urls')),
 ]
