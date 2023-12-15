@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from datetime import datetime
 from insta.managers import CommentManager, MomentLikeManager, MomentManager, ProfileManager, CommentLikeManager, SubscriptionManager
+from django.db.models.signals import pre_delete, post_save
+from django.dispatch import receiver
 
 # Create your models here.
 
@@ -31,9 +33,13 @@ class Moment(models.Model):
 
     objects = MomentManager()
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        Profile.objects.filter(id=self.author_id).update(number_of_moments=models.F('number_of_moments') + 1)
+@receiver(post_save, sender=Moment, dispatch_uid='moment_create_signal')
+def increment_user_moments(sender, instance, using, **kwargs):
+    Profile.objects.filter(id=instance.author_id).update(number_of_moments=models.F('number_of_moments') + 1)
+        
+@receiver(pre_delete, sender=Moment, dispatch_uid='moment_delete_signal')
+def decrement_user_moments(sender, instance, using, **kwargs):
+    Profile.objects.filter(id=instance.author_id).update(number_of_moments=models.F('number_of_moments') - 1)
 
 # Комментарий – содержание, автор, дата написания
 class Comment(models.Model): 
@@ -52,13 +58,18 @@ class Subscription(models.Model):
 
     objects = SubscriptionManager()
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        Profile.objects.filter(id=self.author_id).update(number_of_subscribers=models.F('number_of_subscribers') + 1)
-        Profile.objects.filter(id=self.subscriber_id).update(number_of_subscriptions=models.F('number_of_subscriptions') + 1)
-
     class Meta:
         unique_together = ('author', 'subscriber')
+
+@receiver(post_save, sender=Subscription, dispatch_uid='subscription_create_signal')
+def increment_user_subs(sender, instance, using, **kwargs):
+    Profile.objects.filter(id=instance.author_id).update(number_of_subscribers=models.F('number_of_subscribers') + 1)
+    Profile.objects.filter(id=instance.subscriber_id).update(number_of_subscriptions=models.F('number_of_subscriptions') + 1)
+
+@receiver(pre_delete, sender=Subscription, dispatch_uid='subscription_delete_signal')
+def decrement_user_subs(sender, instance, using, **kwargs):
+    Profile.objects.filter(id=instance.author_id).update(number_of_subscribers=models.F('number_of_subscribers') - 1)
+    Profile.objects.filter(id=instance.subscriber_id).update(number_of_subscriptions=models.F('number_of_subscriptions') - 1)
 
 # Лайк - автор, момент/комментарий, дата создания
 class MomentLike(models.Model):
@@ -68,13 +79,9 @@ class MomentLike(models.Model):
 
     objects = MomentLikeManager()
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        Profile.objects.filter(id=self.author_id).update(rating=models.F('rating') + 1)
-    
     class Meta:
         unique_together = ('author', 'moment')     
-
+        
 class CommentLike(models.Model):
     author = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='comment_likes_by')
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='comment_likes')
@@ -82,12 +89,20 @@ class CommentLike(models.Model):
 
     objects = CommentLikeManager()
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        Profile.objects.filter(id=self.author_id).update(rating=models.F('rating') + 1)
-
     class Meta:
         unique_together = ('author', 'comment')        
+        
+@receiver(post_save, sender=MomentLike, dispatch_uid='moment_like_create_signal')
+@receiver(post_save, sender=CommentLike, dispatch_uid='comment_like_create_signal')
+def increment_user_rating(sender, instance, using, **kwargs):
+    author_id = instance.comment.author_id if hasattr(instance, 'comment') else instance.moment.author_id
+    Profile.objects.filter(id=author_id).update(rating=models.F('rating') + 1)
+        
+@receiver(pre_delete, sender=MomentLike, dispatch_uid='moment_like_delete_signal')
+@receiver(pre_delete, sender=CommentLike, dispatch_uid='comment_like_delete_signal')
+def decrement_user_rating(sender, instance, using, **kwargs):
+    author_id = instance.comment.author_id if hasattr(instance, 'comment') else instance.moment.author_id
+    Profile.objects.filter(id=author_id).update(rating=models.F('rating') - 1)
 
 # Теги - момент, название
 class Tag(models.Model):

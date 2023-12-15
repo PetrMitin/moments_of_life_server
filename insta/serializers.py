@@ -9,11 +9,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
-    
+    avatar = serializers.SerializerMethodField()
+
     class Meta:
         model = Profile
-        fields = ['id', 'number_of_moments', 'number_of_subscribers', 'number_of_subscriptions', 'rating', 'user']
+        fields = ['id', 'number_of_moments', 'number_of_subscribers', 'number_of_subscriptions', 'rating', 'user', 'avatar']
         depth = 1
+    
+    def get_avatar(self, profile):
+        request = self.context.get('request')
+        if (profile.avatar and request):
+            avatar = profile.avatar.url
+            return request.build_absolute_uri(avatar)
+        return ""
 
 class CommentSerializer(serializers.ModelSerializer):
     author = ProfileSerializer()
@@ -27,10 +35,18 @@ class MomentSerializer(serializers.ModelSerializer):
     is_liked = serializers.BooleanField(read_only=True)
     comments = CommentSerializer(many=True)
     author = ProfileSerializer()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Moment
         fields = ['id', 'content', 'author', 'creation_date', 'image', 'is_liked', 'comments']
+    
+    def get_image(self, moment):
+        request = self.context.get('request')
+        if moment.image and request:
+            image = moment.image.url
+            return request.build_absolute_uri(image)
+        return ""
 
 class MomentLikeEventSerializer(serializers.ModelSerializer):
     class Meta:

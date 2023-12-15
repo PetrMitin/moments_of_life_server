@@ -12,6 +12,7 @@ from django.core.paginator import Paginator, InvalidPage, PageNotAnInteger, Empt
 from insta.validators import *
 from django.db.models.functions import Coalesce
 from django.contrib.auth.hashers import make_password
+from insta.utils import login_user
 
 def paginate(objects, page=1, per_page=45):
     try:
@@ -33,8 +34,7 @@ def moments_of_user_subscriptions(request):
     curr_user_subscriptions = Subscription.objects.user_subscribed_to_ids(user_id=user_id).values('author_id')
     moments = Moment.objects.moments_by_user_subscriptions(curr_profile_id=curr_profile_id, curr_user_subscriptions=curr_user_subscriptions)
     data = paginate(moments, page).object_list
-    serializer = MomentSerializer(data, many=True)
-    print(serializer.data[0]['id'], serializer.data[0]['is_liked'])
+    serializer = MomentSerializer(data, many=True, context={"request": request})
     return JsonResponse(serializer.data, safe=False)
 
 @api_view(['GET'])
@@ -44,7 +44,7 @@ def moments_of_profile(request, profile_pk):
     if not curr_profile_id:
         return HttpResponseBadRequest()
     moments = Moment.objects.moments_by_profile_id(curr_profile_id=curr_profile_id, profile_id=profile_pk)
-    serializer = MomentSerializer(moments, many=True)
+    serializer = MomentSerializer(moments, many=True, context={"request": request})
     return JsonResponse(serializer.data, safe=False)
 
 @api_view(['GET'])
@@ -78,7 +78,7 @@ def profile_data(request, profile_pk):
     if not profile:
         return HttpResponseNotFound()
     is_subscribed_flag = bool(Profile.objects.is_subscribed_to_profile(user_id=user_id, profile_id=profile.id))
-    serializer = ProfileSerializer(profile)
+    serializer = ProfileSerializer(profile, context={"request": request})
     return JsonResponse({'profile': serializer.data, 'is_subscribed_flag': is_subscribed_flag}, safe=False)
 
 @api_view(['PUT'])
@@ -97,11 +97,14 @@ def update_profile(request, profile_pk):
     if avatar:
         profile.avatar = avatar
     profile.save()
-    user.username = username
-    user.email = email
-    #user.set_password(raw_password=password)
+    if username:
+        user.username = username
+    if email:
+        user.email = email
+    if password:
+        user.set_password(raw_password=password)
     user.save()
-    serializer = ProfileSerializer(profile)
+    serializer = ProfileSerializer(profile, context={"request": request})
     return JsonResponse(serializer.data)
     
 @api_view(['GET'])
@@ -110,7 +113,7 @@ def profiles_by_username(request):
     if not username:
         return HttpResponseBadRequest()
     profiles = Profile.objects.profiles_by_username(username=username)
-    serializer = ProfileSerializer(profiles, many=True)
+    serializer = ProfileSerializer(profiles, many=True, context={"request": request})
     return JsonResponse(serializer.data, safe=False)
 
 @api_view(['GET'])
@@ -119,7 +122,7 @@ def moments_by_tag(request):
     if not tag:
         return HttpResponseBadRequest()
     moments = Moment.objects.search_by_tag(tag=tag)
-    serializer = MomentSerializer(moments, many=True)
+    serializer = MomentSerializer(moments, many=True, context={"request": request})
     return JsonResponse(serializer.data, safe=False)
 
 @csrf_protect
@@ -135,7 +138,7 @@ def create_moment(request):
     new_moment = Moment.objects.create_moment(title, content, profile_data, image)
     new_tags = [Tag(moment_id=new_moment.id, tag=tag) for tag in new_moment.content.split(' ') if tag[0] == '#']
     Tag.objects.bulk_create(new_tags)
-    serializer = MomentSerializer(new_moment)
+    serializer = MomentSerializer(new_moment, context={"request": request})
     return JsonResponse(serializer.data, safe=False)
 
 @csrf_protect
@@ -233,9 +236,15 @@ def registration(request):
     user = User(username=username, email=email)
     user.set_password(raw_password=password)
     user.save()
-    profile = Profile.objects.create(user=user, avatar=avatar)
-    serializer = ProfileSerializer(profile)
-    return JsonResponse(serializer.data)
+    if user and request:
+        password = request.data.get('password')
+        user = auth.authenticate(username=user.username, password=password)
+        if user:
+            auth.login(request, user)
+            profile = Profile.objects.profile_by_user_id(user.id)
+            serializer = ProfileSerializer(profile, context={"request": request})
+            return JsonResponse(serializer.data)
+    return HttpResponseBadRequest()
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -246,12 +255,12 @@ def login(request):
     if not is_login_data_valid(email, password):
         return HttpResponseBadRequest()
     user = User.objects.filter(email=email).first()
-    if user:
+    if user and request:
         user = auth.authenticate(username=user.username, password=password)
         if user:
             auth.login(request, user)
             profile = Profile.objects.profile_by_user_id(user.id)
-            serializer = ProfileSerializer(profile)
+            serializer = ProfileSerializer(profile, context={"request": request})
             return JsonResponse(serializer.data)
     return HttpResponseBadRequest()
 
@@ -275,6 +284,6 @@ def current_profile_data(request):
         profile = Profile.objects.profile_by_user_id(user_id=request.user.id)
         if not profile:
             return HttpResponseNotFound()
-        serializer = ProfileSerializer(profile)
+        serializer = ProfileSerializer(profile, context={"request": request})
         return JsonResponse({serializer.data})
     return HttpResponseBadRequest()

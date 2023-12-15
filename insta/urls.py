@@ -21,8 +21,8 @@ moment_urls = [
 
 comment_urls = [
     path('create/', create_comment, name='create_comment'),
-    path('like', create_comment_like, name='like_comment'),
-    path('unlike', delete_comment_like, name='unlike_comment'),
+    path('like/', create_comment_like, name='like_comment'),
+    path('unlike/', delete_comment_like, name='unlike_comment'),
 ]
 
 auth_urls = [

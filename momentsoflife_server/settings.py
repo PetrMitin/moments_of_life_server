@@ -57,7 +57,7 @@ PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
 
-SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SAMESITE = False
 
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
@@ -131,7 +131,8 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated'
-    ]
+    ],
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
 }
 
 # Internationalization
@@ -155,3 +156,6 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+MEDIA_ROOT = f'{BASE_DIR}/media'
+MEDIA_URL = '/media/'

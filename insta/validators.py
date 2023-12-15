@@ -81,10 +81,7 @@ def is_registration_data_valid(email, username, password, avatar):
     return True
 
 def is_update_profile_data_valid(email, username, password, avatar):
-    print(email, username, password, avatar)
-    if not (email and username):
-        return False
-    if not (avatar == None or isinstance(avatar, InMemoryUploadedFile)):
+    if avatar and not isinstance(avatar, InMemoryUploadedFile):
         return False
     return True
 

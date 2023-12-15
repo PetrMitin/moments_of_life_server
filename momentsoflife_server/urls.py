@@ -17,9 +17,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from insta.urls import urls
+from django.conf import settings
+from django.conf.urls.static import static 
 
 urlpatterns = [
     path('api/', include(urls)),
     path('admin/', admin.site.urls, name='admin'),
     path('auth/', include('rest_framework.urls')),
 ]
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
