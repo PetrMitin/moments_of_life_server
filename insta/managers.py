@@ -28,7 +28,6 @@ class MomentManager(models.Manager):
             )
     
     def moments_by_user_subscriptions(self, curr_profile_id, curr_user_subscriptions):
-        print(curr_profile_id)
         result = (self
                 .filter(author__in=curr_user_subscriptions)
                 .order_by('creation_date')

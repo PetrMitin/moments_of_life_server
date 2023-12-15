@@ -41,7 +41,8 @@ def moments_of_user_subscriptions(request):
 def moments_of_profile(request, profile_pk):
     curr_user_id = request.user.id
     curr_profile_id = Profile.objects.profile_by_user_id(curr_user_id).id
-    if not curr_profile_id:
+    profile = Profile.objects.filter(id=profile_pk).first()
+    if not (curr_profile_id and profile):
         return HttpResponseBadRequest()
     moments = Moment.objects.moments_by_profile_id(curr_profile_id=curr_profile_id, profile_id=profile_pk)
     serializer = MomentSerializer(moments, many=True, context={"request": request})
@@ -53,15 +54,15 @@ def events_of_user(request):
     page = page if page else 1
     user_id = request.user.id
 
-    moment_likes = MomentLike.objects.by_moment_author_user(user_id=user_id)
+    moment_likes = MomentLike.objects.by_moment_author_user(user_id=user_id).order_by('-creation_date')
     moment_likes_data = paginate(moment_likes, page, 15).object_list
     moment_likes_serializer = MomentLikeEventSerializer(moment_likes_data, many=True)
 
-    comment_likes = CommentLike.objects.by_comment_author_user(user_id=user_id)
+    comment_likes = CommentLike.objects.by_comment_author_user(user_id=user_id).order_by('-creation_date')
     comment_likes_data = paginate(comment_likes, page, 15).object_list
     comment_like_serializer = CommentLikeEventSerializer(comment_likes_data, many=True)
 
-    subs = Subscription.objects.by_subscribed_to_user(user_id=user_id)
+    subs = Subscription.objects.by_subscribed_to_user(user_id=user_id).order_by('-subscription_date')
     subs_data = paginate(subs, page, 15).object_list
     sub_serializer = SubscriptionEventSerializer(subs_data, many=True)
 
@@ -132,7 +133,10 @@ def create_moment(request):
     content = request.data.get("content")
     profile = request.data.get("author")
     image = request.data.get("image")
-    profile_data = json.loads(profile)
+    if profile:
+        profile_data = json.loads(profile)
+    else:
+        return HttpResponseBadRequest()
     if not is_moment_creation_data_valid(title, content, profile_data, image):
         return HttpResponseBadRequest()
     new_moment = Moment.objects.create_moment(title, content, profile_data, image)
@@ -147,7 +151,6 @@ def create_comment(request):
     content = request.data.get('content')
     profile_data = request.data.get('author')
     moment_id = request.data.get('moment_id')
-    print(content, profile_data, moment_id)
     if not is_comment_creation_data_valid(content, profile_data, moment_id):
         return HttpResponseBadRequest()
     new_comment = Comment.objects.create_comment(content, profile_data, moment_id)
@@ -237,11 +240,10 @@ def registration(request):
     user.set_password(raw_password=password)
     user.save()
     if user and request:
-        password = request.data.get('password')
         user = auth.authenticate(username=user.username, password=password)
         if user:
             auth.login(request, user)
-            profile = Profile.objects.profile_by_user_id(user.id)
+            profile = Profile.objects.create(user=user, avatar=avatar)
             serializer = ProfileSerializer(profile, context={"request": request})
             return JsonResponse(serializer.data)
     return HttpResponseBadRequest()

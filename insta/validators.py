@@ -71,10 +71,9 @@ def is_delete_subscription_like_data_valid(author_id, subscriber_id):
     return True
 
 def is_registration_data_valid(email, username, password, avatar):
-    print(email, username, password, avatar)
     if not (email and username and password):
         return False
-    if not (avatar == None or isinstance(avatar, InMemoryUploadedFile)):
+    if avatar and not isinstance(avatar, InMemoryUploadedFile):
         return False
     if User.objects.filter(email=email).first() or User.objects.filter(username=username).first():
         return False

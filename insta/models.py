@@ -4,6 +4,7 @@ from datetime import datetime
 from insta.managers import CommentManager, MomentLikeManager, MomentManager, ProfileManager, CommentLikeManager, SubscriptionManager
 from django.db.models.signals import pre_delete, post_save
 from django.dispatch import receiver
+import os
 
 # Create your models here.
 
@@ -22,6 +23,12 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.username
+    
+@receiver(pre_delete, sender=Profile, dispatch_uid='profile_delete_signal')
+def delete_profile_avatar(sender, instance, using, **kwargs):
+    avatar = instance.avatar
+    if avatar and os.path.isfile(avatar.path):
+        os.remove(avatar.path)
 
 # Момент – заголовок, содержание, автор, дата создания, изображение.
 class Moment(models.Model):
@@ -40,6 +47,10 @@ def increment_user_moments(sender, instance, using, **kwargs):
 @receiver(pre_delete, sender=Moment, dispatch_uid='moment_delete_signal')
 def decrement_user_moments(sender, instance, using, **kwargs):
     Profile.objects.filter(id=instance.author_id).update(number_of_moments=models.F('number_of_moments') - 1)
+    image = instance.image
+    print(image)
+    if image and os.path.isfile(image.path):
+        os.remove(image.path)
 
 # Комментарий – содержание, автор, дата написания
 class Comment(models.Model): 
