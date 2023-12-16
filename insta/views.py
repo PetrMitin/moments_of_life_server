@@ -32,7 +32,10 @@ def moments_of_user_subscriptions(request):
         return HttpResponseBadRequest()
     curr_profile_id = curr_profile.id
     curr_user_subscriptions = Subscription.objects.user_subscribed_to_ids(user_id=user_id).values('author_id')
-    moments = Moment.objects.moments_by_user_subscriptions(curr_profile_id=curr_profile_id, curr_user_subscriptions=curr_user_subscriptions)
+    moments = Moment.objects.moments_by_user_subscriptions(
+        curr_profile_id=curr_profile_id, 
+        curr_user_subscriptions=curr_user_subscriptions
+    ).order_by('-creation_date')
     data = paginate(moments, page).object_list
     serializer = MomentSerializer(data, many=True, context={"request": request})
     return JsonResponse(serializer.data, safe=False)
