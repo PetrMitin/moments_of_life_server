@@ -1,0 +1,14 @@
+{
+    "allowed_origins": [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:8000"
+    ],
+    "allow_subscribe_for_client": true,
+    "admin_password": "password",
+    "admin_secret": "secret",
+    "admin": true,
+    "api_key": "api_key",
+    "token_hmac_secret_key": "token_hmac_secret_key",
+    "port": "8081"
+}

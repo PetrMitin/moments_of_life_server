@@ -31,7 +31,8 @@ auth_urls = [
     path('login/', login, name='login'),
     path('logout/', logout, name='logout'),
     path('is-authenticated/', is_authenticated, name='is_authenticated'),
-    path('current-profile-data/', current_profile_data, name='current_profile_data')
+    path('current-profile-data/', current_profile_data, name='current_profile_data'),
+    path('get-centrifugo-token/', get_centrifugo_token, name='get_centrifugo_token')
 ]
 
 urls = [

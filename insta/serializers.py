@@ -46,19 +46,26 @@ class MomentSerializer(serializers.ModelSerializer):
         return ''
 
 class MomentLikeEventSerializer(serializers.ModelSerializer):
+    author = ProfileSerializer()
+    
     class Meta:
         model = MomentLike
         fields = ['id', 'creation_date', 'author', 'moment']
         depth = 2
 
 class CommentLikeEventSerializer(serializers.ModelSerializer):
+    author = ProfileSerializer()
+    
     class Meta:
         model = CommentLike
         fields = ['id', 'creation_date', 'author', 'comment']
         depth = 2
 
 class SubscriptionEventSerializer(serializers.ModelSerializer):
+    subscriber = ProfileSerializer()
+    author = ProfileSerializer()
+    
     class Meta:
         model = Subscription
-        fields = ['id', 'subscription_date', 'author', 'subscriber']
+        fields = ['id', 'creation_date', 'author', 'subscriber']
         depth = 2

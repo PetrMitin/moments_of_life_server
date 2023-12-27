@@ -13,6 +13,13 @@ from insta.validators import *
 from django.db.models.functions import Coalesce
 from django.contrib.auth.hashers import make_password
 from insta.utils import login_user
+from cent import Client
+import jwt
+import time
+
+CENTRIFUGO_URL = 'http://localhost:8081/api'
+API_KEY = 'api_key'
+centrifugo_client = Client(CENTRIFUGO_URL, api_key=API_KEY, timeout=1)
 
 def paginate(objects, page=1, per_page=45):
     try:
@@ -65,7 +72,7 @@ def events_of_user(request):
     comment_likes_data = paginate(comment_likes, page, 15).object_list
     comment_like_serializer = CommentLikeEventSerializer(comment_likes_data, many=True)
 
-    subs = Subscription.objects.by_subscribed_to_user(user_id=user_id).order_by('-subscription_date')
+    subs = Subscription.objects.by_subscribed_to_user(user_id=user_id).order_by('-creation_date')
     subs_data = paginate(subs, page, 15).object_list
     sub_serializer = SubscriptionEventSerializer(subs_data, many=True)
 
@@ -169,6 +176,7 @@ def create_moment_like(request):
         return HttpResponseBadRequest()
     moment_like = MomentLike.objects.create(moment_id=moment_id, author_id=author_id)
     serializer = MomentLikeEventSerializer(moment_like)
+    centrifugo_client.publish(f'events.{moment_like.moment.author_id}', serializer.data)
     return JsonResponse(serializer.data, safe=False)
 
 @csrf_protect
@@ -190,6 +198,7 @@ def create_comment_like(request):
         return HttpResponseBadRequest()
     comment_like = CommentLike.objects.create(comment_id=comment_id, author_id=author_id)
     serializer = CommentLikeEventSerializer(comment_like)
+    centrifugo_client.publish(f'events.{comment_like.comment.author_id}', serializer.data)
     return JsonResponse(serializer.data, safe=False)
 
 @csrf_protect
@@ -211,6 +220,7 @@ def create_subscription(request):
         return HttpResponseBadRequest()
     sub = Subscription.objects.create(subscriber_id=subscriber_id, author_id=author_id)
     serializer = SubscriptionEventSerializer(sub)
+    centrifugo_client.publish(f'events.{author_id}', serializer.data)
     return JsonResponse(serializer.data, safe=False)
 
 @csrf_protect
@@ -291,4 +301,14 @@ def current_profile_data(request):
             return HttpResponseNotFound()
         serializer = ProfileSerializer(profile, context={"request": request})
         return JsonResponse({serializer.data})
+    return HttpResponseBadRequest()
+
+@api_view(['GET'])
+def get_centrifugo_token(request):
+    if request.user and request.user.is_authenticated:
+        profile = Profile.objects.profile_by_user_id(user_id=request.user.id)
+        if not profile:
+            return HttpResponseNotFound()
+        token = jwt.encode({"sub": str(profile.id), "exp": int(time.time()) + 60*60}, "token_hmac_secret_key", algorithm="HS256")
+        return JsonResponse({"token": token})
     return HttpResponseBadRequest()

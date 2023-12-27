@@ -65,7 +65,7 @@ class Comment(models.Model):
 class Subscription(models.Model):
     author = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='subscribed_to')
     subscriber = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='subscriber')
-    subscription_date = models.DateTimeField(auto_now_add=True)
+    creation_date = models.DateTimeField(auto_now_add=True)
 
     objects = SubscriptionManager()
 
